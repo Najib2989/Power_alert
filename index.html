@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power_Alert - Smart Power Outage Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet CSS (OpenStreetMap - 100% Free, No API Key Required) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+        }
+
+        /* OpenStreetMap Container & Popup */
+        #powerAlertMap {
+            width: 100%;
+            height: 380px;
+            border-radius: 12px;
+            z-index: 10;
+        }
+        .leaflet-container {
+            font-family: 'Hind Siliguri', sans-serif !important;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 10px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen pb-12 selection:bg-amber-400 selection:text-slate-900">
+
+    <!-- Toast Notification Banner -->
+    <div id="toast"
+        class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <div>
+            <p id="toastTitle" class="text-xs font-bold text-amber-400">সফল!</p>
+            <p id="toastMessage" class="text-xs text-slate-300">স্ট্যাটাস আপডেট করা হয়েছে।</p>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <nav
+        class="bg-slate-800/80 backdrop-blur-md border-b border-slate-700 px-6 py-4 flex justify-between items-center sticky top-0 z-40">
+        <div class="flex items-center space-x-3">
+            <div class="bg-amber-400/10 p-2 rounded-lg border border-amber-400/20">
+                <i class="fa-solid fa-bolt-lightning text-amber-400 text-xl animate-pulse"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-wide text-white">Power_<span class="text-amber-400">Alert</span></h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div
+                class="hidden sm:flex items-center space-x-2 text-xs text-slate-400 bg-slate-900/50 px-3 py-1.5 rounded-lg border border-slate-700/50">
+                <i class="fa-regular fa-calendar-days text-amber-400"></i>
+                <span id="currentDate">তারিখ লোড হচ্ছে...</span>
+            </div>
+            <span
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 mr-1.5 bg-emerald-400 rounded-full animate-ping"></span> লাইভ সার্ভিস
+            </span>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Left Column: Core Outage Prediction & Notification -->
+        <div class="space-y-6">
+
+            <!-- Core Feature: Outage Prediction & Percentage -->
+            <!-- Core Feature: Outage Prediction & Percentage (AI ML Powered) -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+                <!-- AI Model Header Badge -->
+                <div class="flex justify-between items-center mb-3 pb-2.5 border-b border-slate-700/60">
+                    <span class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-brain mr-1.5 text-amber-400 animate-pulse"></i> AI পূর্বাভাস (ML Model)
+                    </span>
+                    <span id="aiActiveBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-ping"></span> অন-ডিমান্ড
+                    </span>
+                </div>
+
+                <div class="flex justify-between items-center gap-2 mb-4">
+                    <span class="text-xs sm:text-sm font-semibold text-slate-400 flex items-center shrink-0">
+                        <i class="fa-solid fa-location-dot text-rose-500 mr-1.5"></i> লোকেশন নির্বাচন
+                    </span>
+                    <div class="flex items-center space-x-1.5">
+                        <select id="locationSelect" onchange="updateLocationData()" class="bg-slate-900 text-amber-400 font-mono text-xs border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-400 cursor-pointer">
+                            <!-- ঢাকা মেট্রোপলিটন এলাকা -->
+                            <optgroup label="ঢাকা মেট্রোপলিটন">
+                                <option value="mirpur">মিরপুর, ঢাকা</option>
+                                <option value="dhanmondi">ধানমন্ডি, ঢাকা</option>
+                                <option value="uttara">উত্তরা, ঢাকা</option>
+                                <option value="gulshan">গুলশান, ঢাকা</option>
+                                <option value="banani">বনানী, ঢাকা</option>
+                                <option value="mohammadpur">মোহাম্মদপুর, ঢাকা</option>
+                                <option value="badda">বাড্ডা, ঢাকা</option>
+                                <option value="motijheel">মতিঝিল, ঢাকা</option>
+                                <option value="paltan">পল্টন, ঢাকা</option>
+                                <option value="shahbagh">শাহবাগ, ঢাকা</option>
+                                <option value="ramna">রমনা, ঢাকা</option>
+                                <option value="tejgaon" selected>তেজগাঁও, ঢাকা</option>
+                                <option value="khilgaon">খিলগাঁও, ঢাকা</option>
+                                <option value="rampura">রামপুরা, ঢাকা</option>
+                                <option value="jatrabari">যাত্রাবাড়ী, ঢাকা</option>
+                                <option value="demra">ডেমরা, ঢাকা</option>
+                                <option value="kadamtali">কদমতলী, ঢাকা</option>
+                                <option value="sutrapur">সূত্রাপুর, ঢাকা</option>
+                                <option value="kotwali">কোতোয়ালী, ঢাকা</option>
+                                <option value="lalbagh">লালবাগ, ঢাকা</option>
+                                <option value="hazaribagh">হাজারীবাগ, ঢাকা</option>
+                                <option value="kamrangirchar">কামরাঙ্গীরচর, ঢাকা</option>
+                                <option value="kafrul">কাফরুল, ঢাকা</option>
+                                <option value="cantonment">ঢাকা ক্যান্টনমেন্ট, ঢাকা</option>
+                                <option value="khilkhet">খিলক্ষেত, ঢাকা</option>
+                                <option value="uttarkhan">উত্তরখান, ঢাকা</option>
+                                <option value="dakshinkhan">দক্ষিণখান, ঢাকা</option>
+                                <option value="turag">তুরাগ, ঢাকা</option>
+                            </optgroup>
+
+                            <!-- ঢাকা জেলার অন্যান্য উপজেলা -->
+                            <optgroup label="ঢাকা জেলা (উপজেলা)">
+                                <option value="savar">সাভার, ঢাকা</option>
+                                <option value="dhamrai">ধামরাই, ঢাকা</option>
+                                <option value="keraniganj">কেরানীগঞ্জ, ঢাকা</option>
+                                <option value="dohar">দোহার, ঢাকা</option>
+                                <option value="nawabganj">নবাবগঞ্জ, ঢাকা</option>
+                            </optgroup>
+
+                            <!-- ঢাকা বিভাগের অন্যান্য জেলা -->
+                            <optgroup label="ঢাকা বিভাগের অন্যান্য জেলা">
+                                <option value="gazipur">গাজীপুর</option>
+                                <option value="narayanganj">নারায়ণগঞ্জ</option>
+                                <option value="munshiganj">মুন্সীগঞ্জ</option>
+                                <option value="manikganj">মানিকগঞ্জ</option>
+                                <option value="narsingdi">নরসিংদী</option>
+                                <option value="faridpur">ফরিদপুর</option>
+                                <option value="gopalganj">গোপালগঞ্জ</option>
+                                <option value="madaripur">মাদারীপুর</option>
+                                <option value="rajbari">রাজবাড়ী</option>
+                                <option value="shariatpur">শরীয়তপুর</option>
+                                <option value="tangail">টাঙ্গাইল</option>
+                                <option value="kishoreganj">কিশোরগঞ্জ</option>
+                            </optgroup>
+                        </select>
+                        <button onclick="updateLocationData(true)" title="নতুন তথ্য দিয়ে AI প্রেডিকশন রিফ্রেশ করুন" class="bg-slate-900 hover:bg-amber-400 hover:text-slate-900 text-amber-400 p-1.5 rounded-lg border border-slate-700 transition cursor-pointer">
+                            <i id="aiRefreshIcon" class="fa-solid fa-arrows-rotate text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="my-4 text-center bg-slate-900/80 p-5 rounded-xl border border-slate-700/60 shadow-inner">
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-[11px] text-slate-400 uppercase tracking-wider">বিদ্যুৎ যাওয়ার সম্ভাবনা</p>
+                        <span id="aiRiskLabel" class="text-[10px] px-2 py-0.5 rounded-md font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">AI যাচাই হচ্ছে...</span>
+                    </div>
+                    <div id="outagePercentage" class="text-4xl font-extrabold text-amber-400 mb-3 transition-all duration-300">৫০%</div>
+                    <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 border border-slate-700">
+                        <div id="outageBar"
+                            class="bg-gradient-to-r from-amber-500 to-rose-500 h-full rounded-full transition-all duration-500"
+                            style="width: 50%"></div>
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-2.5 flex items-center justify-between">
+                        <span><i class="fa-solid fa-microchip text-amber-400 mr-1"></i>RandomForest AI প্রেডিকশন</span>
+                        <span id="aiTimestamp" class="text-slate-500 font-mono">আপডেট: এইমাত্র</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2.5 text-sm text-slate-300">
+                    <div class="flex justify-between py-1.5 border-b border-slate-700/50">
+                        <span class="text-slate-400"><i class="fa-regular fa-clock mr-2 text-amber-400"></i>সম্ভাব্য সময়:</span>
+                        <span id="outageTime" class="font-bold text-white">ঝুঁকি যাচাই হচ্ছে...</span>
+                    </div>
+                    <div class="flex justify-between py-1.5">
+                        <span class="text-slate-400"><i class="fa-solid fa-hourglass-half mr-2 text-amber-400"></i>স্থায়িত্বকাল:</span>
+                        <span id="outageDuration" class="font-bold text-white">০ মিনিট</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 2: Smart Notification & Charging Reminder -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+                <h2 class="text-md font-bold mb-3 flex items-center text-amber-400">
+                    <i class="fa-solid fa-bell mr-2"></i> স্মার্ট নোটিফিকেশন ও অ্যালার্ট
+                </h2>
+
+                <!-- Reminder Alert Box -->
+                <div
+                    class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 mb-4 flex items-start space-x-3">
+                    <i class="fa-solid fa-battery-quarter text-amber-400 text-xl mt-0.5 animate-bounce"></i>
+                    <div class="text-xs">
+                        <strong class="text-amber-300 block mb-1">চার্জ দেওয়ার রিমাইন্ডার!</strong>
+                        আগামী ৪০ মিনিটের মধ্যে বিদ্যুৎ বিভ্রাটের সম্ভাবনা রয়েছে। আপনার মোবাইল ও পাওয়ার ব্যাংক চার্জ
+                        করে নিন।
+                    </div>
+                </div>
+
+                <!-- Toggle Controls -->
+                <div class="space-y-3 text-sm">
+                    <label
+                        class="flex items-center justify-between cursor-pointer p-2 hover:bg-slate-700/30 rounded-lg transition">
+                        <span class="text-slate-300">১৫ মিনিট পূর্বে সতর্কবার্তা</span>
+                        <input type="checkbox" checked class="w-4 h-4 accent-amber-400 rounded cursor-pointer">
+                    </label>
+                    <label
+                        class="flex items-center justify-between cursor-pointer p-2 hover:bg-slate-700/30 rounded-lg transition">
+                        <span class="text-slate-300">ডিভাইস চার্জ রিমাইন্ডার</span>
+                        <input type="checkbox" checked class="w-4 h-4 accent-amber-400 rounded cursor-pointer">
+                    </label>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Middle Column: Crowdsourcing & Heatmap -->
+        <div class="md:col-span-2 space-y-6">
+
+            <!-- Feature 1: Real-time Crowdsourcing -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+                <h2 class="text-md font-bold mb-2 flex items-center text-amber-400">
+                    <i class="fa-solid fa-users mr-2"></i> লাইভ ইউজার রিপোর্ট (Crowdsourcing)
+                </h2>
+                <p class="text-xs text-slate-400 mb-4">আপনার বর্তমান এলাকার লাইভ স্ট্যাটাস আপডেট দিন বা অন্যদের রিপোর্ট
+                    দেখুন।</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <button onclick="reportPower(false)"
+                        class="flex items-center justify-center space-x-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white py-3.5 rounded-xl font-bold transition shadow-lg shadow-rose-900/20 cursor-pointer">
+                        <i class="fa-solid fa-power-off"></i>
+                        <span>বিদ্যুৎ নেই</span>
+                    </button>
+                    <button onclick="reportPower(true)"
+                        class="flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-3.5 rounded-xl font-bold transition shadow-lg shadow-emerald-900/20 cursor-pointer">
+                        <i class="fa-solid fa-lightbulb"></i>
+                        <span>বিদ্যুৎ এসেছে</span>
+                    </button>
+                </div>
+
+                <div
+                    class="bg-slate-900/70 p-3.5 rounded-xl flex items-center justify-between text-xs border border-slate-700/50">
+                    <span class="text-slate-300 flex items-center"><i
+                            class="fa-solid fa-circle-check text-emerald-400 mr-2 text-sm"></i> গত ১০ মিনিটে এলাকা থেকে
+                        রিপোর্ট:</span>
+                    <span class="font-bold text-amber-400 text-sm"><span id="reportCount">১৮</span> জন নিশ্চিত
+                        করেছেন</span>
+                </div>
+            </div>
+
+            <!-- AI Grid Intelligence & Outage Analysis Card (power_alert_model (1).pkl) -->
+            <div class="bg-slate-800 border border-purple-500/30 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="text-md font-bold flex items-center text-purple-400">
+                        <i class="fa-solid fa-microchip mr-2"></i> গ্রিড ডেটা ও AI পূর্বাভাস (ML Model)
+                    </h2>
+                    <span id="aiStatusBadge" class="text-xs bg-purple-500/10 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">লোড হচ্ছে...</span>
+                </div>
+                <p class="text-xs text-slate-400 mb-4">RandomForest AI মডেল এলাকাভিত্তিক সরকারি বিদ্যুৎ বরাদ্দ, চাহিদা ও লোডশেডিং ঘাটতি স্বয়ংক্রিয়ভাবে হিসাব করছে।</p>
+
+                <!-- Automated Grid Parameters per Area -->
+                <div class="space-y-3 mb-4">
+                    <!-- 1. Government Power Supply (সরকারি বিদ্যুৎ বরাদ্দ ও উৎপাদন) -->
+                    <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/50">
+                        <div class="flex justify-between items-center mb-1.5 text-xs">
+                            <span class="text-slate-300 flex items-center">
+                                <i class="fa-solid fa-industry text-purple-400 mr-2 text-sm"></i> সরকারি বিদ্যুৎ বরাদ্দ (উৎপাদন):
+                            </span>
+                            <span id="aiGovGen" class="text-purple-300 font-bold font-mono text-sm">-- MW</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/60">
+                            <div id="aiGenBar" class="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-700" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Area Real Demand (এলাকার চাহিদা) -->
+                    <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/50">
+                        <div class="flex justify-between items-center mb-1.5 text-xs">
+                            <span class="text-slate-300 flex items-center">
+                                <i class="fa-solid fa-bolt text-amber-400 mr-2 text-sm"></i> এলাকার প্রকৃত চাহিদা:
+                            </span>
+                            <span id="aiAreaDem" class="text-amber-300 font-bold font-mono text-sm">-- MW</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/60">
+                            <div id="aiDemBar" class="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-700" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Load Shedding Level (লোডশেডিং স্তর) -->
+                    <div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/50 flex items-center justify-between">
+                        <span class="text-slate-300 flex items-center text-xs">
+                            <i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2 text-sm"></i> গ্রিড লোডশেডিং স্তর:
+                        </span>
+                        <span id="aiLsBadge" class="text-xs px-2.5 py-1 rounded-md font-bold font-mono border bg-slate-800 text-slate-300 border-slate-600">লোড হচ্ছে...</span>
+                    </div>
+                </div>
+
+                <!-- Live AI Machine Learning Analysis Box -->
+                <div class="bg-slate-900/90 rounded-xl p-4 border border-purple-500/30">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-2">
+                            <span id="aiAreaZoneBadge" class="text-[11px] text-purple-300 font-medium bg-purple-500/15 px-2.5 py-0.5 rounded-full border border-purple-500/30">এলাকা প্রোফাইল</span>
+                            <span id="aiRiskBadge" class="text-[11px] px-2.5 py-0.5 rounded-full font-bold border bg-slate-800 text-slate-300 border-slate-700">বিশ্লেষণ চলছে...</span>
+                        </div>
+                        <span class="text-xs text-slate-400">ML সম্ভাবনা: <strong id="aiMlProbVal" class="text-purple-400 font-mono text-sm">--%</strong></span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700 mb-2.5">
+                        <div id="aiProbBar" class="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-purple-500 to-rose-500" style="width: 0%"></div>
+                    </div>
+                    <p id="aiDynamicMessage" class="text-xs text-slate-300 leading-relaxed">
+                        নির্বাচিত এলাকার তথ্য বিশ্লেষণ করে AI মডেল বিদ্যুৎ পরিস্থিতি পর্যবেক্ষণ করছে...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 3: Live Interactive Heatmap Preview -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                    <h2 class="text-md font-bold flex items-center text-amber-400">
+                        <i class="fa-solid fa-map-location-dot mr-2"></i> লাইভ হিটম্যাপ (Area Status)
+                    </h2>
+                    <div class="flex flex-wrap gap-3 text-xs">
+                        <span class="flex items-center"><span
+                                class="w-2.5 h-2.5 bg-emerald-500 rounded-full mr-1.5 shadow-sm shadow-emerald-500"></span>
+                            স্বাভাবিক</span>
+                        <span class="flex items-center"><span
+                                class="w-2.5 h-2.5 bg-amber-500 rounded-full mr-1.5 shadow-sm shadow-amber-500"></span>
+                            রিস্ক</span>
+                        <span class="flex items-center"><span
+                                class="w-2.5 h-2.5 bg-rose-500 rounded-full mr-1.5 shadow-sm shadow-rose-500"></span>
+                            লোডশেডিং</span>
+                    </div>
+                </div>
+
+                <!-- OpenStreetMap (OSM) + Leaflet.js Interactive Live Map -->
+                <div class="relative rounded-xl overflow-hidden border border-slate-700 shadow-inner bg-slate-950">
+                    <div id="powerAlertMap" style="width: 100%; height: 380px; min-height: 380px; z-index: 10;"></div>
+                    <div class="absolute bottom-2 left-2 z-[400] bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/70 text-[11px] text-slate-300 shadow-lg flex items-center">
+                        <i class="fa-solid fa-map-pin text-amber-400 mr-1.5 animate-bounce"></i>লোকেশন নির্বাচন পরিবর্তন করলে ম্যাপ স্বয়ংক্রিয়ভাবে ওই এলাকায় ফোকাস করবে
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 6: Low-voltage & Appliance Safety Alert -->
+            <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl">
+                <h2 class="text-md font-bold mb-3 flex items-center text-amber-400">
+                    <i class="fa-solid fa-shield-halved mr-2"></i> ভোল্টেজ ও ডিভাইস সেফটি অ্যালার্ট
+                </h2>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div
+                        class="bg-slate-900/70 p-4 rounded-xl border border-slate-700/60 flex justify-between items-center shadow-inner">
+                        <div>
+                            <p class="text-xs text-slate-400 mb-1">বর্তমান ভোল্টেজ লেভেল</p>
+                            <p class="text-xl font-extrabold text-emerald-400">220V <span
+                                    class="text-xs text-slate-400 font-normal">(স্বাভাবিক)</span></p>
+                        </div>
+                        <div class="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                            <i class="fa-solid fa-gauge-high text-emerald-400 text-2xl"></i>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-slate-900/70 p-4 rounded-xl border border-slate-700/60 flex justify-between items-center shadow-inner">
+                        <div>
+                            <p class="text-xs text-slate-400 mb-1">ভোল্টেজ রিপোর্ট করুন</p>
+                            <button onclick="reportVoltage()"
+                                class="text-xs text-amber-400 hover:text-amber-300 font-semibold underline mt-1 block text-left cursor-pointer">
+                                লো-ভোল্টেজ ইস্যু ফ্ল্যাগ করুন
+                            </button>
+                        </div>
+                        <div class="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Leaflet JS CDN (OpenStreetMap - 100% Free, No API Key Required) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Separate Map Module File -->
+    <script src="map.js"></script>
+
+    <!-- Interactive JS -->
+    <script>
+        // Set dynamic date in Bengali or general format
+        const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+        const currentDateEl = document.getElementById('currentDate');
+        if (currentDateEl) {
+            currentDateEl.innerText = new Date().toLocaleDateString('bn-BD', options);
+        }
+
+        // ১. লোকেশন পরিবর্তন বা ইউজার আপডেটের সাথে সাথে AI পূর্বাভাস ফেচ করা
+        async function updateLocationData(isManual = false) {
+            const selectedLocation = document.getElementById('locationSelect').value;
+            const refreshIcon = document.getElementById('aiRefreshIcon');
+            if (refreshIcon) refreshIcon.classList.add('fa-spin');
+            
+            try {
+                // FastAPI ব্যাকএন্ডে GET রিকোয়েস্ট পাঠানো
+                const response = await fetch(`http://127.0.0.1:8000/api/outage-stats/${selectedLocation}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    // ১. টপ কার্ডের মানগুলো আপডেট
+                    const percEl = document.getElementById('outagePercentage');
+                    const barEl = document.getElementById('outageBar');
+                    const riskBadgeTop = document.getElementById('aiRiskLabel');
+                    
+                    percEl.innerText = result.percentage;
+                    barEl.style.width = result.width;
+                    document.getElementById('outageTime').innerText = result.time;
+                    document.getElementById('outageDuration').innerText = result.duration;
+                    
+                    // কালার ও ব্যাজ ডাইনামিক করা
+                    const pVal = parseInt(result.percentage) || 50;
+                    if (pVal >= 70) {
+                        barEl.className = 'bg-gradient-to-r from-rose-500 to-red-600 h-full rounded-full transition-all duration-500';
+                        percEl.className = 'text-4xl font-extrabold text-rose-400 mb-3 transition-all duration-300';
+                        if (riskBadgeTop) {
+                            riskBadgeTop.innerText = result.risk_label || 'উচ্চ ঝুঁকি';
+                            riskBadgeTop.className = 'text-[10px] px-2 py-0.5 rounded-md font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30';
+                        }
+                    } else if (pVal >= 40) {
+                        barEl.className = 'bg-gradient-to-r from-amber-500 to-orange-500 h-full rounded-full transition-all duration-500';
+                        percEl.className = 'text-4xl font-extrabold text-amber-400 mb-3 transition-all duration-300';
+                        if (riskBadgeTop) {
+                            riskBadgeTop.innerText = result.risk_label || 'মাঝারি ঝুঁকি';
+                            riskBadgeTop.className = 'text-[10px] px-2 py-0.5 rounded-md font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30';
+                        }
+                    } else {
+                        barEl.className = 'bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500';
+                        percEl.className = 'text-4xl font-extrabold text-emerald-400 mb-3 transition-all duration-300';
+                        if (riskBadgeTop) {
+                            riskBadgeTop.innerText = result.risk_label || 'স্বাভাবিক / কম ঝুঁকি';
+                            riskBadgeTop.className = 'text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+                        }
+                    }
+
+                    // ২. সরকারি বিদ্যুৎ বরাদ্দ, চাহিদা ও লোডশেডিং কার্ড আপডেট (power_alert_model (1).pkl ভিত্তিক)
+                    if (document.getElementById('aiGovGen') && result.generation_mw !== undefined) {
+                        document.getElementById('aiGovGen').innerText = `${result.generation_mw} MW`;
+                        const genPct = Math.min(100, Math.max(10, Math.round((result.generation_mw / 12000) * 100)));
+                        document.getElementById('aiGenBar').style.width = `${genPct}%`;
+                    }
+
+                    if (document.getElementById('aiAreaDem') && result.demand_mw !== undefined) {
+                        document.getElementById('aiAreaDem').innerText = `${result.demand_mw} MW`;
+                        const demPct = Math.min(100, Math.max(10, Math.round((result.demand_mw / 12000) * 100)));
+                        document.getElementById('aiDemBar').style.width = `${demPct}%`;
+                    }
+
+                    // লোডশেডিং ব্যাজ আপডেট
+                    const lsBadge = document.getElementById('aiLsBadge');
+                    if (lsBadge && result.load_shedding_text) {
+                        lsBadge.innerText = result.load_shedding_text;
+                        if (result.ls_badge_color === 'red') {
+                            lsBadge.className = 'text-xs px-2.5 py-1 rounded-md font-bold font-mono border bg-rose-500/15 text-rose-400 border-rose-500/30';
+                        } else if (result.ls_badge_color === 'amber') {
+                            lsBadge.className = 'text-xs px-2.5 py-1 rounded-md font-bold font-mono border bg-amber-500/15 text-amber-400 border-amber-500/30';
+                        } else if (result.ls_badge_color === 'yellow') {
+                            lsBadge.className = 'text-xs px-2.5 py-1 rounded-md font-bold font-mono border bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
+                        } else {
+                            lsBadge.className = 'text-xs px-2.5 py-1 rounded-md font-bold font-mono border bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+                        }
+                    }
+
+                    // ৩. AI বিশ্লেষণ বক্স আপডেট
+                    if (document.getElementById('aiAreaZoneBadge') && result.zone_type) {
+                        document.getElementById('aiAreaZoneBadge').innerText = `${result.area_name || ''} - ${result.zone_type}`;
+                    }
+
+                    const aiRiskBadge = document.getElementById('aiRiskBadge');
+                    if (aiRiskBadge) {
+                        aiRiskBadge.innerText = result.risk_label || 'স্বাভাবিক';
+                        if (result.risk_color === 'red') {
+                            aiRiskBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-bold border bg-rose-500/15 text-rose-400 border-rose-500/30';
+                        } else if (result.risk_color === 'yellow') {
+                            aiRiskBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-bold border bg-amber-500/15 text-amber-300 border-amber-500/30';
+                        } else {
+                            aiRiskBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-bold border bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+                        }
+                    }
+
+                    if (document.getElementById('aiMlProbVal')) {
+                        const mlProb = result.ai_details?.ml_probability ?? pVal;
+                        document.getElementById('aiMlProbVal').innerText = `${mlProb}%`;
+                    }
+
+                    if (document.getElementById('aiProbBar')) {
+                        const p = result.percentage || '50%';
+                        document.getElementById('aiProbBar').style.width = p;
+                        if (pVal >= 70) {
+                            document.getElementById('aiProbBar').className = 'h-full rounded-full transition-all duration-700 bg-gradient-to-r from-amber-500 to-rose-600';
+                        } else if (pVal >= 40) {
+                            document.getElementById('aiProbBar').className = 'h-full rounded-full transition-all duration-700 bg-gradient-to-r from-yellow-500 to-amber-500';
+                        } else {
+                            document.getElementById('aiProbBar').className = 'h-full rounded-full transition-all duration-700 bg-gradient-to-r from-emerald-500 to-teal-500';
+                        }
+                    }
+
+                    if (document.getElementById('aiDynamicMessage') && result.ai_message) {
+                        document.getElementById('aiDynamicMessage').innerText = result.ai_message;
+                    }
+
+                    if (document.getElementById('aiTimestamp') && result.ai_details?.timestamp) {
+                        document.getElementById('aiTimestamp').innerText = `আপডেট: ${result.ai_details.timestamp}`;
+                    }
+
+                    if (document.getElementById('reportCount') && result.total_reports !== undefined) {
+                        document.getElementById('reportCount').innerText = result.total_reports;
+                    }
+
+                    // OpenStreetMap এ নির্বাচিত এলাকা ফোকাস করা (Smooth FlyTo / SetView)
+                    if (typeof focusLocationOnMap === 'function') {
+                        focusLocationOnMap(selectedLocation);
+                    }
+
+                    if (isManual) {
+                        showToast(`${result.area_name || selectedLocation}-এর সরকারি গ্রিড ও AI পূর্বাভাস আপডেট হয়েছে!`, 'success');
+                    }
+                }
+            } catch (error) {
+                console.error('API Error:', error);
+                showToast('সার্ভার থেকে AI ডেটা আনতে সমস্যা হচ্ছে!', 'warning');
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+            }
+        }
+
+        // ২. ইউজার যখন রিপোর্ট সাবমিট করবে (বিদ্যুৎ নেই / এসেছে)
+        async function reportPower(hasPower) {
+            const selectedLocation = document.getElementById('locationSelect').value;
+            
+            try {
+                // FastAPI ব্যাকএন্ডে POST রিকোয়েস্ট পাঠিয়ে Neon ডাটাবেজে সেভ করা
+                const response = await fetch('http://127.0.0.1:8000/api/report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        location: selectedLocation,
+                        has_power: hasPower
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showToast('আপনার রিপোর্ট সফলভাবে রেকর্ড করা হয়েছে!', 'success');
+                    // রিপোর্ট জমার সাথে সাথে রিয়েল-টাইম পার্সেন্টেজ রিফ্রেশ করে নেওয়া
+                    updateLocationData();
+                    if (typeof loadMapMarkersData === 'function') loadMapMarkersData();
+                }
+            } catch (error) {
+                console.error('Report Error:', error);
+                showToast('রিপোর্ট জমা দিতে ব্যর্থ হয়েছে!', 'warning');
+            }
+        }
+
+        // ৩. ভোল্টেজ ফ্ল্যাকচুয়েশন রিপোর্ট সাবমিট করার ফাংশন
+        async function reportVoltage() {
+            const selectedLocation = document.getElementById('locationSelect').value;
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/voltage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        location: selectedLocation,
+                        voltage_issue: 'low_voltage'
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showToast('ভোল্টেজ রিপোর্ট সফলভাবে জমা হয়েছে!', 'warning');
+                }
+            } catch (error) {
+                console.error('Voltage report error:', error);
+                showToast('ভোল্টেজ রিপোর্ট জমা দিতে সমস্যা হচ্ছে!', 'warning');
+            }
+        }
+
+
+        // স্বয়ংক্রিয় AI পূর্বাভাস সিস্টেম (ম্যানুয়াল স্লাইডার প্রয়োজন নেই)
+
+        // AI স্ট্যাটাস চেক
+        async function checkAIStatus() {
+            try {
+                const res = await fetch('http://127.0.0.1:8000/api/ai-status');
+                const data = await res.json();
+                const badge = document.getElementById('aiStatusBadge');
+                if (badge) {
+                    if (data.model_loaded) {
+                        badge.innerText = '✓ AI সক্রিয়';
+                        badge.className = 'ml-auto text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full';
+                    } else {
+                        badge.innerText = '✗ AI লোড হয়নি';
+                        badge.className = 'ml-auto text-xs bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full';
+                    }
+                }
+            } catch(e) { /* silent */ }
+        }
+
+        // ম্যাপে ক্লিক করে নির্দিষ্ট লোকেশনের পূর্বাভাস দেখা
+        function selectLocationFromMap(locId) {
+            const selectEl = document.getElementById('locationSelect');
+            if (selectEl) {
+                selectEl.value = locId;
+                updateLocationData(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // পেজ লোড হওয়ার সাথে সাথে প্রথম লোকেশনের রিয়েল-টাইম ডেটা লোড করা
+        window.onload = function() {
+            updateLocationData();
+            checkAIStatus();
+            if (typeof initPowerAlertMap === 'function') initPowerAlertMap();
+        };
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+            const toastMsg = document.getElementById('toastMessage');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastIcon = document.getElementById('toastIcon');
+
+            if (toastMsg) toastMsg.innerText = message;
+
+            if (type === 'success') {
+                if (toastTitle) toastTitle.innerText = 'ধন্যবাদ!';
+                if (toastIcon) toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            } else if (type === 'warning') {
+                if (toastTitle) toastTitle.innerText = 'সতর্কবার্তা!';
+                if (toastIcon) toastIcon.className = 'fa-solid fa-triangle-exclamation text-amber-400 text-lg';
+            } else {
+                if (toastTitle) toastTitle.innerText = 'তথ্য আপডেট';
+                if (toastIcon) toastIcon.className = 'fa-solid fa-circle-info text-sky-400 text-lg';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+    </script>
+</body>
+
+</html>
