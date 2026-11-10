@@ -392,6 +392,10 @@
 
     <!-- Interactive JS -->
     <script>
+        // অটোমেটিক API Base URL: Live Server (পোর্ট 5500/5501) বা Vercel উভয় পরিবেশেই কাজ করবে
+        const API_BASE = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && (window.location.port !== '8000')
+            ? 'http://127.0.0.1:8000'
+            : '';
         // Set dynamic date in Bengali or general format
         const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
         const currentDateEl = document.getElementById('currentDate');
@@ -407,7 +411,7 @@
             
             try {
                 // FastAPI ব্যাকএন্ডে GET রিকোয়েস্ট পাঠানো
-                const response = await fetch(`/api/outage-stats/${selectedLocation}`);
+                const response = await fetch(`${API_BASE}/api/outage-stats/${selectedLocation}`);
                 const result = await response.json();
                 
                 if (result.success) {
@@ -543,7 +547,7 @@
             
             try {
                 // FastAPI ব্যাকএন্ডে POST রিকোয়েস্ট পাঠিয়ে Neon ডাটাবেজে সেভ করা
-                const response = await fetch('/api/report', {
+                const response = await fetch(`${API_BASE}/api/report`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -569,7 +573,7 @@
         async function reportVoltage() {
             const selectedLocation = document.getElementById('locationSelect').value;
             try {
-                const response = await fetch('/api/voltage', {
+                const response = await fetch(`${API_BASE}/api/voltage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -593,7 +597,7 @@
         // AI স্ট্যাটাস চেক
         async function checkAIStatus() {
             try {
-                const res = await fetch('/api/ai-status');
+                const res = await fetch(`${API_BASE}/api/ai-status`);
                 const data = await res.json();
                 const badge = document.getElementById('aiStatusBadge');
                 if (badge) {
