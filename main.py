@@ -59,10 +59,7 @@ def load_ai_model():
 # সার্ভার চালুর সাথে সাথে AI মডেল লোড করা
 load_ai_model()
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://neondb_owner:npg_Cawpt7ELeP9q@ep-late-mouse-b4m39ye3-pooler.c-6.us-east-2.aws.neon.tech/power_alert_db?sslmode=require"
-).replace("sslmode=verify-full", "sslmode=require")
+DATABASE_URL = os.getenv("DATABASE_URL", "").replace("sslmode=verify-full", "sslmode=require")
 
 def get_db_connection():
     """Neon PostgreSQL এর সাথে ডাটাবেজ কানেকশন তৈরি করে"""

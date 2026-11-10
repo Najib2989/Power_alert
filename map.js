@@ -127,7 +127,7 @@ async function loadMapMarkersData() {
     if (!powerAlertMap || !mapMarkersLayer) return;
 
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/map-data');
+        const response = await fetch('/api/map-data');
         const data = await response.json();
         const locations = (data && data.success && data.locations) ? data.locations : [];
 

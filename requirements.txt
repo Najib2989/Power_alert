@@ -1,0 +1,7 @@
+fastapi
+psycopg2-binary
+python-dotenv
+scikit-learn
+joblib
+numpy
+

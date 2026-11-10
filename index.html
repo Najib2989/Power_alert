@@ -407,7 +407,7 @@
             
             try {
                 // FastAPI ব্যাকএন্ডে GET রিকোয়েস্ট পাঠানো
-                const response = await fetch(`http://127.0.0.1:8000/api/outage-stats/${selectedLocation}`);
+                const response = await fetch(`/api/outage-stats/${selectedLocation}`);
                 const result = await response.json();
                 
                 if (result.success) {
@@ -543,7 +543,7 @@
             
             try {
                 // FastAPI ব্যাকএন্ডে POST রিকোয়েস্ট পাঠিয়ে Neon ডাটাবেজে সেভ করা
-                const response = await fetch('http://127.0.0.1:8000/api/report', {
+                const response = await fetch('/api/report', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -569,7 +569,7 @@
         async function reportVoltage() {
             const selectedLocation = document.getElementById('locationSelect').value;
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/voltage', {
+                const response = await fetch('/api/voltage', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -593,7 +593,7 @@
         // AI স্ট্যাটাস চেক
         async function checkAIStatus() {
             try {
-                const res = await fetch('http://127.0.0.1:8000/api/ai-status');
+                const res = await fetch('/api/ai-status');
                 const data = await res.json();
                 const badge = document.getElementById('aiStatusBadge');
                 if (badge) {
